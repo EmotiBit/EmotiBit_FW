@@ -1094,24 +1094,27 @@ bool loadConfigFile(String filename) {
 	// Allocate the memory pool on the stack.
 	// Don't forget to change the capacity to match your JSON document.
 	// Use arduinojson.org/assistant to compute the capacity.
-	//StaticJsonBuffer<1024> jsonBuffer;
-	StaticJsonBuffer<1024> jsonBuffer;
+	StaticJsonDocument<1024> jsonDoc;
 
 	// Parse the root object
-	JsonObject &root = jsonBuffer.parseObject(file);
+	DeserializationError err = deserializeJson(jsonDoc,file);
 
-	if (!root.success()) {
-		Serial.println(F("Failed to parse config file"));
+	if (err) {
+		Serial.print(F("deserializeJson() failed with code "));
+		Serial.println(err.c_str());
 		return false;
 	}
 
-	// Copy values from the JsonObject to the Config
-	configSize = root.get<JsonVariant>("WifiCredentials").as<JsonArray>().size();
+	// Copy values from the JsonDocument to EmotiBitConfig
+	// https://arduinojson.org/v6/doc/deserialization/
+	// ssid and password default can be set by = jsonDoc[i] | "Default", but string already defaults to ""
+	//Explicit casting here is unneccessary, but generally safer
+	configSize = jsonDoc["WifiCredentials"].size(); 
 	Serial.print("ConfigSize: ");
 	Serial.println(configSize);
 	for (size_t i = 0; i < configSize; i++) {
-		configList[i].ssid = root["WifiCredentials"][i]["ssid"] | "";
-		configList[i].password = root["WifiCredentials"][i]["password"] | "";
+		configList[i].ssid = jsonDoc["WifiCredentials"][i]["ssid"].as<String>();
+		configList[i].password = jsonDoc["WifiCredentials"][i]["password"].as<String>();
 		Serial.println(configList[i].ssid);
 		Serial.println(configList[i].password);
 	}
@@ -1121,7 +1124,6 @@ bool loadConfigFile(String filename) {
 	//	sizeof(config.hostname));          // <- destination's capacity
 
 	// Close the file (File's destructor doesn't close the file)
-	// ToDo: Handle multiple credentials
 
 	file.close();
 	return true;
